@@ -14,72 +14,43 @@ struct TodoItem: Identifiable, Codable, Hashable {
     var id = UUID()
     var title: String
     var isDone: Bool
+    var subTasks: [SubTask]
 }
 
-struct ContentView: View {
-    // 데이터를 담을 변수 만들기
-    @State private var newTask = "" // 입력창에 쓸 글자
-    @State private var tasks: [TodoItem] = []
-    var body: some View {
-        // 이 안에서는 다른 화면으로 이동할 수 있다.
-        NavigationStack {
-        // 2. 화면 배치 시작 (VStack: 위에서 아래로 쌓기
-        VStack {
-            Text("내 투두 리스트")
-                .font(.largeTitle)
-                .padding()
-            // 3. 입력창과 버튼을 가로로 배치
-            HStack {
-                TextField ("할 일을 입력하세요...", text: $newTask).textFieldStyle(RoundedBorderTextFieldStyle())
-                // 텍스트는 왼쪽, 버튼은 오른쪽으로 밀어주는 역할을 한다.
-                Spacer()
-                Button("추가") {
-                    if !newTask.isEmpty {
-                        tasks.append(TodoItem(title: newTask, isDone: false))
-                        newTask = ""
-                        
-                        saveTasks()
-                    }
-                }
-            }
-            .padding()
-            
-            // 4. 리스트 보여주기
-            List($tasks) { task in
-                HStack {
-                    // 지정된 뷰로 이동하는 곳.
-                    NavigationLink(destination: DetailView(task: task.title.wrappedValue)) {
-                        Text(task.title.wrappedValue)
-                    }
-                    
-                    Spacer()
-                    
-                    Button(action:{
-                        if let index = tasks.firstIndex(of: task.wrappedValue) {
-                            tasks.remove(at: index)
-                        }
-                        saveTasks()
-                    }) {
-                        Text("🗑️")
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-                
-            }.onAppear {
-                loadTasks()
-            }
-            }
-        }
-        .padding()
+struct SubTask: Identifiable, Codable, Hashable {
+    var id = UUID()
+    var title: String
+    var isDone: Bool
+    var memo: String
+}
+
+
+import Foundation
+import Observation
+
+@Observable // 이 매크로가 이 객체가 관찰 가능하다는것을 알려준다.
+class TaskStore {
+    var tasks: [TodoItem] = []
+    
+    func addTask(title: String){
+        let newTask = TodoItem(title: title, isDone: false, subTasks: [])
+        tasks.append(newTask)
+        saveTasks()
     }
     
-    // 데이터를 JSON으로 인코딩 해서 저장한다.
+    func removeTask(task: TodoItem) {
+        if let index = tasks.firstIndex(of: task) {
+            tasks.remove(at: index)
+        }
+        saveTasks()
+    }
+    // 데이터를 저장한다.
     func saveTasks() {
         if let encodedData = try? JSONEncoder().encode(tasks) {
             UserDefaults.standard.set(encodedData, forKey: "SavedTasks")
         }
+        print(tasks)
     }
-    
     
     // 데이터를 불러와서 decoded한다.
     func loadTasks() {
@@ -91,24 +62,96 @@ struct ContentView: View {
     }
 }
 
+struct ContentView: View {
+    // 데이터를 담을 변수 만들기
+    @State private var newTask = "" // 입력창에 쓸 글자
+    @State private var tasks: [TodoItem] = []
+    
+    @State private var taskStore = TaskStore()
+    var body: some View {
+        // 이 안에서는 다른 화면으로 이동할 수 있다.
+        NavigationStack {
+        // 2. 화면 배치 시작 (VStack: 위에서 아래로 쌓기
+        VStack {
+            Text("작업 목록")
+                .font(.largeTitle)
+                .padding()
+            // 3. 입력창과 버튼을 가로로 배치
+                HStack {
+                    TextField ("할 일을 입력하세요...", text: $newTask).textFieldStyle(RoundedBorderTextFieldStyle())
+                    // 텍스트는 왼쪽, 버튼은 오른쪽으로 밀어주는 역할을 한다.
+                    Spacer()
+                    Button("추가") {
+                        if !newTask.isEmpty {
+                            taskStore.addTask(title: newTask)
+                            newTask = ""
+                        }
+                    }
+                }
+                .padding()
+                
+                // 4. 리스트 보여주기
+                List {
+                    ForEach($taskStore.tasks) { $task in
+                        HStack {
+                            NavigationLink(task.title) {
+                                DetailView(task: $task)
+                            }
+                            
+                            Spacer()
+                            
+                            Button("삭제") {
+                                taskStore.removeTask(task: task)
+                            }
+                        }
+                    }
+                }
+                .onAppear {
+                    taskStore.loadTasks()
+                }
+            }
+        }.onChange(of: taskStore.tasks, {
+            taskStore.saveTasks()
+        })
+        .padding()
+        
+    }
+}
+
 struct DetailView: View {
-    let task: String // 목록에서 전달받을 할 일 내용
+    @Binding var task: TodoItem // 목록에서 전달받을 할 일 내용
+    
+    @State private var newSubtaskTitle: String = ""
     
     var body: some View {
-        VStack(spacing: 20) {
-            Text("상세 내용")
-                .font(.headline)
+        VStack {
+            Text("선택된 할 일: \(task.title)")
+                .font(.largeTitle)
                 .foregroundColor(.gray)
+            HStack {
+                
+                TextField("플로우", text: $newSubtaskTitle).padding()
+                
+                Button ("세부 할일 추가"){
+                    let newSubtask = SubTask(title: newSubtaskTitle, isDone: false, memo: "")
+                    
+                    task.subTasks.append(newSubtask)
+                    
+                    newSubtaskTitle = ""
+                }.padding()
+                
+            }
+            List {
+                ForEach(task.subTasks) { subTask in
+                    Text(subTask.title)
+                }
+            }
             
-            Text(task) // 전달받은 할일을 크게 보여줌
-                .font(.system(size: 40, weight: .bold))
-                .padding()
             
-            Text("이곳에 나중에 메모나 날짜 기능을 추가할 수 있다.")
-                .padding()
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(10)
+                
         }.frame(minWidth: 400, minHeight: 400) // 창 크기 넉넉하게
+            .navigationTitle("세부할일 관리")
+            .padding()
         
     }
     
