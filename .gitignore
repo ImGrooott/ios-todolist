@@ -1,0 +1,13 @@
+## 빌드 관련 파일 (Build Artifacts)
+build/
+DerivedData/
+
+## 사용자 데이터 (User-Specific Data)
+*.xcodeproj/xcuserdata/
+
+## Mac OS 관련 (Finder 설정 파일)
+.DS_Store
+
+## 로그 파일 및 임시 파일
+*.log
+*.swp
