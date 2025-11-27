@@ -18,7 +18,7 @@ import SwiftUI
 
 struct TodoItem: Identifiable, Codable, Hashable {
     var id = UUID()
-
+    var taskClassNm: String
     var title: String
 
     var isDone: Bool
@@ -45,8 +45,8 @@ import Observation
 class TaskStore {
     var tasks: [TodoItem] = []
 
-    func addTask(title: String) {
-        let newTask = TodoItem(title: title, isDone: false, subTasks: [])
+    func addTask(title: String, taskClassNm: String) {
+        let newTask = TodoItem(taskClassNm: taskClassNm, title: title, isDone: false, subTasks: [])
 
         tasks.append(newTask)
 
@@ -86,6 +86,7 @@ struct ContentView: View {
     // 데이터를 담을 변수 만들기
 
     @State private var newTask = "" // 입력창에 쓸 글자
+    @State private var newClassNm = ""
 
     @State private var tasks: [TodoItem] = []
 
@@ -103,19 +104,23 @@ struct ContentView: View {
                 // 3. 입력창과 버튼을 가로로 배치
 
                 HStack {
-                    TextField("할 일을 입력하세요...", text: $newTask).textFieldStyle(RoundedBorderTextFieldStyle())
-
-                    // 텍스트는 왼쪽, 버튼은 오른쪽으로 밀어주는 역할을 한다.
-
+                    VStack{
+                        HStack {
+                            Text("클래스:")
+                            TextField("작업 클래스를 입력하세요", text: $newClassNm).textFieldStyle(RoundedBorderTextFieldStyle())
+                        }
+                        HStack {
+                            Text("할 일:")
+                            TextField("할 일을 입력하세요...", text: $newTask).textFieldStyle(RoundedBorderTextFieldStyle())
+                        }
+                    }
                     Spacer()
 
                     Button("추가") {
-                        if !newTask.isEmpty {
-                            taskStore.addTask(title: newTask)
-
-                            newTask = ""
-                        }
+                        saveTask()
                     }
+                }.onSubmit {
+                    saveTask()
                 }
 
                 .padding()
@@ -125,6 +130,7 @@ struct ContentView: View {
                 List {
                     ForEach($taskStore.tasks) { $task in
                         HStack {
+                            Text("\(task.taskClassNm):")
                             NavigationLink(task.title) {
                                 DetailView(task: $task)
                             }
@@ -149,6 +155,15 @@ struct ContentView: View {
 
         .padding()
     }
+    
+    private func saveTask() {
+        if !newTask.isEmpty {
+            taskStore.addTask(title: newTask, taskClassNm: newClassNm)
+
+            newTask = ""
+            newClassNm = ""
+        }
+    }
 }
 
 struct DetailView: View {
@@ -158,23 +173,17 @@ struct DetailView: View {
 
     var body: some View {
         VStack {
-            Text(task.title)
+            Text("\(task.taskClassNm): \(task.title)")
                 .font(.largeTitle)
                 .foregroundColor(.gray)
-
             HStack {
                 TextField("플로우", text: $newSubtaskTitle).padding()
-
                 Button("세부 할일 추가") {
-                    let newSubtask = SubTask(title: newSubtaskTitle, isDone: false, memo: "")
-
-                    task.subTasks.append(newSubtask)
-
-                    newSubtaskTitle = ""
-
+                    saveSubtask()
                 }.padding()
+            }.onSubmit {
+                saveSubtask()
             }
-
             List {
                 ForEach(task.subTasks) { subTask in
                     Text(subTask.title)
@@ -184,6 +193,14 @@ struct DetailView: View {
         }.frame(minWidth: 300, minHeight: 300) // 창 크기 넉넉하게
             .navigationTitle("세부할일 관리")
             .padding()
+    }
+    
+    private func saveSubtask() {
+        let newSubtask = SubTask(title: newSubtaskTitle, isDone: false, memo: "")
+
+        task.subTasks.append(newSubtask)
+
+        newSubtaskTitle = ""
     }
 }
 
