@@ -18,7 +18,6 @@ import SwiftUI
 
 struct TodoItem: Identifiable, Codable, Hashable {
     var id = UUID()
-    var taskClassNm: String
     var title: String
 
     var isDone: Bool
@@ -45,8 +44,8 @@ import Observation
 class TaskStore {
     var tasks: [TodoItem] = []
 
-    func addTask(title: String, taskClassNm: String) {
-        let newTask = TodoItem(taskClassNm: taskClassNm, title: title, isDone: false, subTasks: [])
+    func addTask(title: String) {
+        let newTask = TodoItem(title: title, isDone: false, subTasks: [])
 
         tasks.append(newTask)
 
@@ -86,7 +85,6 @@ struct ContentView: View {
     // 데이터를 담을 변수 만들기
 
     @State private var newTask = "" // 입력창에 쓸 글자
-    @State private var newClassNm = ""
 
     @State private var tasks: [TodoItem] = []
 
@@ -96,24 +94,25 @@ struct ContentView: View {
         NavigationStack {
             // 2. 화면 배치 시작 (VStack: 위에서 아래로 쌓기
             VStack {
-                Text("작업 목록")
-
+                HStack {
+                    Spacer()
+                    NavigationLink(destination: MedicineView()) {
+                        Text("💊골이 아픈것 같으면 누르세요")
+                            .cornerRadius(10)
+                    }
+                }
+                // 아키텍처 간단하게 적고, 조금씩 쌓아가면서 개발
+                Text("작업목록")
                     .font(.largeTitle)
                     .padding()
 
                 // 3. 입력창과 버튼을 가로로 배치
-
                 HStack {
-                    VStack{
-                        HStack {
-                            Text("클래스:")
-                            TextField("작업 클래스를 입력하세요", text: $newClassNm).textFieldStyle(RoundedBorderTextFieldStyle())
-                        }
                         HStack {
                             Text("할 일:")
                             TextField("할 일을 입력하세요...", text: $newTask).textFieldStyle(RoundedBorderTextFieldStyle())
                         }
-                    }
+                    
                     Spacer()
 
                     Button("추가") {
@@ -130,7 +129,6 @@ struct ContentView: View {
                 List {
                     ForEach($taskStore.tasks) { $task in
                         HStack {
-                            Text("\(task.taskClassNm):")
                             NavigationLink(task.title) {
                                 DetailView(task: $task)
                             }
@@ -158,10 +156,9 @@ struct ContentView: View {
     
     private func saveTask() {
         if !newTask.isEmpty {
-            taskStore.addTask(title: newTask, taskClassNm: newClassNm)
+            taskStore.addTask(title: newTask)
 
             newTask = ""
-            newClassNm = ""
         }
     }
 }
@@ -173,7 +170,7 @@ struct DetailView: View {
 
     var body: some View {
         VStack {
-            Text("\(task.taskClassNm): \(task.title)")
+            Text("\(task.title)")
                 .font(.largeTitle)
                 .foregroundColor(.gray)
             HStack {
@@ -201,6 +198,51 @@ struct DetailView: View {
         task.subTasks.append(newSubtask)
 
         newSubtaskTitle = ""
+    }
+}
+
+struct MedicineView: View {
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("🧐 필독")
+                .font(.largeTitle) // 제일 큰 폰트
+                .fontWeight(.bold) // 굵게
+                .padding(.bottom, 10) // 아래 여백 살짝
+            
+            // 1. 증상 (빨간 알약)
+            VStack(alignment: .leading, spacing: 5) {
+                Text("🔥 증상").font(.headline)
+                Text("CPU 과열 및 RAM 부족")
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.red.opacity(0.1))
+            .cornerRadius(20) // 알약 모양 핵심
+            
+            // 2. 원인 (파란 알약)
+            VStack(alignment: .leading, spacing: 5) {
+                Text("🧐 원인").font(.headline)
+                Text("1. 인지적 구두쇠 (빨리 끝내려는 욕심)")
+                Text("2. 불안의 회피 (생각하는 고통의 회피)")
+                Text("3. 간헐적 강화 (운 좋게 성공한 기억)")
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.blue.opacity(0.1))
+            .cornerRadius(20)
+            
+            // 3. 처방 (초록 알약)
+            VStack(alignment: .leading, spacing: 5) {
+                Text("💊 처방").font(.headline)
+                Text("1. RAM 부족 → 메모장/외부 툴에 기록")
+                Text("2. 시스템 부재 → 멈추고 설계하는 습관 들이기")
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.green.opacity(0.1))
+            .cornerRadius(20)
+        }
+        .padding()
     }
 }
 
