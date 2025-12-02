@@ -100,22 +100,17 @@ struct ContentView: View {
             VStack {
                 HStack {
                     Spacer()
-
                     VStack {
                         NavigationLink(destination: ManualView()) {
                             Text("🛠️ 로직 분석 메뉴얼")
-
                                 .cornerRadius(10)
                         }
-
                         NavigationLink(destination: MedicineView()) {
                             Text("💊 골이 아픈것 같으면 누르세요")
-
                                 .cornerRadius(10)
                         }
                     }
                 }
-
                 // 아키텍처 간단하게 적고, 조금씩 쌓아가면서 개발
 
                 Text("작업목록")
@@ -283,11 +278,13 @@ struct MedicineView: View {
 }
 
 struct ManualView: View {
+    // 1. 스위치
+    @State private var showTemplate = false
+    // 2. 템플릿에 들어갈 내용 (데이터) - 여기서 관리해야 사라지지 않는다.
+    @State private var templateContent = "Entry Point: \n\n\nExit Point:\n\n"
     var body: some View {
         ScrollView {
             VStack(spacing: 25) {
-                // 헤더
-
                 VStack(spacing: 10) {
                     Text("🛠️ 코드 분석 매뉴얼")
 
@@ -303,18 +300,23 @@ struct ManualView: View {
                 .padding(.bottom, 20)
 
                 // STEP 1. 예측 및 그리기
+                Button(action: {
+                    showTemplate = true // 스위치 켜기!
+                }) {
+                    ProcessCard(
+                        step: "STEP 1",
 
-                ProcessCard(
-                    step: "STEP 1",
+                        title: "예측 및 그리기",
 
-                    title: "예측 및 그리기",
+                        description: "Entry Point와 Exit Point만 적는다.\n나머지는 앞으로 채울 것.",
 
-                    description: "Entry Point와 Exit Point만 적는다.\n나머지는 앞으로 채울 것.",
+                        icon: "map.fill",
 
-                    icon: "map.fill",
-
-                    color: .purple
-                )
+                        color: .purple
+                    )
+                }.sheet(isPresented: $showTemplate) {
+                    TemplateEditorView(text: $templateContent)
+                }.buttonStyle(.plain) // 버튼 티 안나게 만듬. 기본값은 입체적인 버튼
 
                 // 화살표 (흐름을 보여줌)
 
@@ -327,20 +329,14 @@ struct ManualView: View {
 
                 ProcessCard(
                     step: "STEP 2",
-
                     title: "파일 수집",
-
                     description: "관련된 파일 이름 목록을 메모장에 적고\n하나씩 확인한다.",
-
-                    icon: "folder.fill", // 또는 doc.text.magnifyingglass
-
+                    icon: "folder.fill",
                     color: .orange
                 )
 
                 // 화살표
-
                 Image(systemName: "arrow.down")
-
                     .font(.title2)
                     .foregroundColor(.gray.opacity(0.5))
 
@@ -348,17 +344,12 @@ struct ManualView: View {
 
                 ProcessCard(
                     step: "STEP 3",
-
                     title: "로직 검증 및 수정",
-
                     description: "로직을 읽으며 예측이 맞는지 확인/수정.\nCall Stack은 메모장에 적으며 내려가자.",
-
                     icon: "checkmark.shield.fill",
-
                     color: .blue
                 )
             }
-
             .padding()
         }
     }
@@ -393,39 +384,62 @@ struct ProcessCard: View {
                         .font(.title2)
                         .foregroundColor(color)
                 }
-
                 Text(step)
-
                     .font(.caption)
                     .fontWeight(.bold)
                     .foregroundColor(color)
             }
-
             // 오른쪽: 내용
-
             VStack(alignment: .leading, spacing: 5) {
                 Text(title)
-
                     .font(.title3)
                     .fontWeight(.bold)
                     .foregroundColor(.primary)
-
                 Text(description)
-
                     .font(.body)
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true) // 줄바꿈 잘 되도록
                     .lineSpacing(4) // 줄 간격 살짝 띄우기
             }
-
             Spacer()
         }
-
         .padding()
         .background(Color.black) // 배경색
         .cornerRadius(15)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2) // 그림자 효과
     }
+}
+
+struct TemplateEditorView: View {
+    // 부모가 빌려준 노트 (@Binding)
+    @Binding var text: String
+
+    // 창을 닫기 위한 도구 (환경 변수)
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+            VStack(spacing: 25) {
+                Text("아키텍처 작성")
+                    .font(.headline)
+                    .foregroundColor(.gray)
+                    .padding(.top)
+
+                TextEditor(text: $text)
+                    .padding(10)
+                    .scrollContentBackground(.hidden)
+                    .background(Color(red: 0.25, green: 0.25, blue: 0.26).cornerRadius(10))
+                    .foregroundColor(Color(nsColor: .textColor)) // 글자색은 기본(흰색/검정)으로
+                    .frame(height: 300)
+                    .padding(10)
+                                
+                
+            }.navigationTitle("템플릿 작성")
+                .toolbar {
+                    Button("완료") {
+                        dismiss()
+                    }
+                }
+        }
 }
 
 #Preview {
