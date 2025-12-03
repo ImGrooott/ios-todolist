@@ -36,12 +36,55 @@ struct SubTask: Identifiable, Codable, Hashable {
     var memo: String
 }
 
+// Codable은 데이터 저장을 위해서
+struct TaskMemo: Identifiable, Codable, Hashable {
+    var id = UUID()
+    var title: String
+    var createdAt: Date = .init() // 시간 계산 용이
+    var startTime: Date?
+    var endTime: Date?
+    var memo: String // 텍스트 데이터를 저장하는 표준 타입
+}
+
+@Observable
+class TaskMemoStore {
+    var taskMemos: [TaskMemo] = []
+
+    func addTaskMemo(title: String, memo: String) {
+        let taskMemo = TaskMemo(title: title, memo: memo)
+        taskMemos.append(taskMemo)
+        print(taskMemo)
+        saveTaskMemos()
+    }
+
+    func saveTaskMemos() {
+        if let encodedData = try? JSONEncoder().encode(taskMemos) {
+            UserDefaults.standard.set(encodedData, forKey: "SavedTaskMemos")
+        }
+    }
+
+    func removeTask(task: TaskMemo) {
+        if let index = taskMemos.firstIndex(of: task) {
+            taskMemos.remove(at: index)
+        }
+
+        saveTaskMemos()
+    }
+
+    func loadTasks() {
+        if let savedData = UserDefaults.standard.data(forKey: "SavedTaskMemos") {
+            if let decodedTasks = try? JSONDecoder().decode([TaskMemo].self, from: savedData) {
+                taskMemos = decodedTasks
+            }
+        }
+    }
+}
+
 import Foundation
 
 import Observation
 
 @Observable // 이 매크로가 이 객체가 관찰 가능하다는것을 알려준다.
-
 class TaskStore {
     var tasks: [TodoItem] = []
 
@@ -67,12 +110,9 @@ class TaskStore {
         if let encodedData = try? JSONEncoder().encode(tasks) {
             UserDefaults.standard.set(encodedData, forKey: "SavedTasks")
         }
-
-        print(tasks)
     }
 
     // 데이터를 불러와서 decoded한다.
-
     func loadTasks() {
         if let savedData = UserDefaults.standard.data(forKey: "SavedTasks") {
             if let decodedTasks = try? JSONDecoder().decode([TodoItem].self, from: savedData) {
@@ -91,17 +131,18 @@ struct ContentView: View {
 
     @State private var taskStore = TaskStore()
 
+    @State private var taskMemoStore = TaskMemoStore()
+
     var body: some View {
         // 이 안에서는 다른 화면으로 이동할 수 있다.
 
         NavigationStack {
             // 2. 화면 배치 시작 (VStack: 위에서 아래로 쌓기
-
             VStack {
                 HStack {
                     Spacer()
                     VStack {
-                        NavigationLink(destination: ManualView()) {
+                        NavigationLink(destination: ManualView(taskMemoStore: $taskMemoStore)) {
                             Text("🛠️ 로직 분석 메뉴얼")
                                 .cornerRadius(10)
                         }
@@ -118,49 +159,26 @@ struct ContentView: View {
                     .font(.largeTitle)
                     .padding()
 
-                // 3. 입력창과 버튼을 가로로 배치
-
-                HStack {
-                    HStack {
-                        Text("할 일:")
-
-                        TextField("할 일을 입력하세요...", text: $newTask).textFieldStyle(RoundedBorderTextFieldStyle())
-                    }
-
-                    Spacer()
-
-                    Button("추가") {
-                        saveTask()
-                    }
-
-                }.onSubmit {
-                    saveTask()
-                }
-
-                .padding()
-
                 // 4. 리스트 보여주기
 
                 List {
-                    ForEach($taskStore.tasks) { $task in
+                    ForEach($taskMemoStore.taskMemos) { $taskMemo in
                         HStack {
-                            NavigationLink(task.title) {
-                                DetailView(task: $task)
+                            Text(taskMemo.createdAt, style: .date)
+                            NavigationLink(taskMemo.title) {
+                                DetailView(taskMemo: $taskMemo)
                             }
                             Spacer()
                             Button("삭제") {
-                                taskStore.removeTask(task: task)
+                                taskMemoStore.removeTask(task: taskMemo)
                             }
                         }
                     }
                 }
                 .onAppear {
-                    taskStore.loadTasks()
+                    taskMemoStore.loadTasks()
                 }
             }
-
-        }.onChange(of: taskStore.tasks) {
-            taskStore.saveTasks()
         }
 
         .padding()
@@ -176,45 +194,29 @@ struct ContentView: View {
 }
 
 struct DetailView: View {
-    @Binding var task: TodoItem // 목록에서 전달받을 할 일 내용
-
-    @State private var newSubtaskTitle: String = ""
+    @Binding var taskMemo: TaskMemo // 데이터 연결
 
     var body: some View {
-        VStack {
-            Text("\(task.title)")
-                .font(.largeTitle)
-                .foregroundColor(.gray)
-
+        VStack(alignment: .leading, spacing: 20) { // 1. 왼쪽 정렬 & 간격 띄우기
             HStack {
-                TextField("플로우", text: $newSubtaskTitle).padding()
-
-                Button("세부 할일 추가") {
-                    saveSubtask()
-
-                }.padding()
-
-            }.onSubmit {
-                saveSubtask()
+                Text(taskMemo.title)
+                    .font(.title) // 맥에서는 largeTitle보다 title이 적당할 때가 많음
+                    .bold() // 제목은 굵게 강조
+                Spacer()
+                Text(taskMemo.createdAt, style: .date)
             }
 
-            List {
-                ForEach(task.subTasks) { subTask in
-                    Text(subTask.title)
-                }
+            Divider() // 2. 제목과 내용 사이 구분선
+
+            ScrollView { // 내용이 길어질 수 있으니 스크롤 가능하게
+                Text(taskMemo.memo)
+                    .font(.body)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-
-        }.frame(minWidth: 300, minHeight: 300) // 창 크기 넉넉하게
-            .navigationTitle("세부할일 관리")
-            .padding()
-    }
-
-    private func saveSubtask() {
-        let newSubtask = SubTask(title: newSubtaskTitle, isDone: false, memo: "")
-
-        task.subTasks.append(newSubtask)
-
-        newSubtaskTitle = ""
+        }
+        .padding()
+        .frame(minWidth: 400, minHeight: 300) // 창 크기 설정
+        .navigationTitle("상세 정보")
     }
 }
 
@@ -278,6 +280,7 @@ struct MedicineView: View {
 }
 
 struct ManualView: View {
+    @Binding var taskMemoStore: TaskMemoStore
     // 1. 스위치
     @State private var showTemplate = false
     // 2. 템플릿에 들어갈 내용 (데이터) - 여기서 관리해야 사라지지 않는다.
@@ -287,7 +290,6 @@ struct ManualView: View {
             VStack(spacing: 25) {
                 VStack(spacing: 10) {
                     Text("🛠️ 코드 분석 매뉴얼")
-
                         .font(.largeTitle)
                         .fontWeight(.heavy)
 
@@ -315,7 +317,8 @@ struct ManualView: View {
                         color: .purple
                     )
                 }.sheet(isPresented: $showTemplate) {
-                    TemplateEditorView(text: $templateContent)
+                    TemplateEditorView(text: $templateContent, store: $taskMemoStore)
+
                 }.buttonStyle(.plain) // 버튼 티 안나게 만듬. 기본값은 입체적인 버튼
 
                 // 화살표 (흐름을 보여줌)
@@ -411,18 +414,31 @@ struct ProcessCard: View {
 }
 
 struct TemplateEditorView: View {
+//    @Environment(TaskStore.self) var store
     // 부모가 빌려준 노트 (@Binding)
     @Binding var text: String
+    @Binding var store: TaskMemoStore
 
+    @State private var title: String = ""
+
+    @State private var showConfetti: Bool = false
     // 창을 닫기 위한 도구 (환경 변수)
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
+        ZStack {
             VStack(spacing: 25) {
                 Text("아키텍처 작성")
                     .font(.headline)
                     .foregroundColor(.gray)
                     .padding(.top)
+
+                HStack {
+                    Text("목표: ")
+                    TextField("구현 목표를 적으세요", text: $title)
+                        .textFieldStyle(.roundedBorder)
+
+                }.padding()
 
                 TextEditor(text: $text)
                     .padding(10)
@@ -431,15 +447,65 @@ struct TemplateEditorView: View {
                     .foregroundColor(Color(nsColor: .textColor)) // 글자색은 기본(흰색/검정)으로
                     .frame(height: 300)
                     .padding(10)
-                                
-                
+
             }.navigationTitle("템플릿 작성")
                 .toolbar {
                     Button("완료") {
-                        dismiss()
+                        // (1) 데이터 저장
+                        store.addTaskMemo(title: title, memo: text)
+
+                        // (2) 빵빠레 터뜨리기!
+                        showConfetti = true
+
+                        // (3) 0.8초만 기다렸다가 창 닫기 (애니메이션 볼 시간 주기)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            title = ""
+                            text = ""
+                            dismiss()
+                        }
                     }
                 }
+            if showConfetti {
+                ConfettiView()
+                    .allowsHitTesting(false) // 터치 무시 (애니메이션 중에도 조작 가능하게)
+            }
         }
+    }
+}
+
+struct ConfettiView: View {
+    @State private var isAnimating = false
+    let colors: [Color] = [.red, .blue, .green, .yellow, .pink, .purple, .orange]
+
+    var body: some View {
+        ZStack {
+            ForEach(0 ..< 50, id: \.self) { _ in
+                Circle()
+                    .fill(colors.randomElement()!)
+                    .frame(width: 8, height: 8)
+                    .modifier(ConfettiParticle(isAnimating: isAnimating))
+            }
+        }
+        .onAppear {
+            isAnimating = true
+        }
+    }
+}
+
+// 파티클 움직임을 담당하는 수식어
+struct ConfettiParticle: ViewModifier {
+    let isAnimating: Bool
+    @State private var randomX: CGFloat = .random(in: -100 ... 100)
+    @State private var randomY: CGFloat = .random(in: -100 ... 100)
+    @State private var randomScale: CGFloat = .random(in: 0.5 ... 1.5)
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(isAnimating ? randomScale : 0.1)
+            .offset(x: isAnimating ? randomX : 0, y: isAnimating ? randomY : 0)
+            .opacity(isAnimating ? 0 : 1)
+            .animation(.easeOut(duration: 1.0), value: isAnimating)
+    }
 }
 
 #Preview {
