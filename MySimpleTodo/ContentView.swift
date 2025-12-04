@@ -169,8 +169,19 @@ struct ContentView: View {
                                 DetailView(taskMemo: $taskMemo)
                             }
                             Spacer()
-                            Button("삭제") {
+                            if let startTime = taskMemo.startTime {
+                                Text("start:")
+                                Text(startTime, style: .time)
+                            }
+                            if let endTime = taskMemo.endTime {
+                                Text("end:")
+                                Text(endTime, style: .time)
+                            }
+                        }.contextMenu {
+                            Button(role: .destructive) {
                                 taskMemoStore.removeTask(task: taskMemo)
+                            } label: {
+                                Label("삭제", systemImage: "trash")
                             }
                         }
                     }
@@ -179,6 +190,8 @@ struct ContentView: View {
                     taskMemoStore.loadTasks()
                 }
             }
+        }.onChange(of: taskMemoStore.taskMemos) {
+            taskMemoStore.saveTaskMemos()
         }
 
         .padding()
@@ -196,6 +209,8 @@ struct ContentView: View {
 struct DetailView: View {
     @Binding var taskMemo: TaskMemo // 데이터 연결
 
+    @State private var showConfetti: Bool = false
+    @State var isEditing: Bool = false
     var body: some View {
         VStack(alignment: .leading, spacing: 20) { // 1. 왼쪽 정렬 & 간격 띄우기
             HStack {
@@ -209,9 +224,58 @@ struct DetailView: View {
             Divider() // 2. 제목과 내용 사이 구분선
 
             ScrollView { // 내용이 길어질 수 있으니 스크롤 가능하게
-                Text(taskMemo.memo)
-                    .font(.body)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                if isEditing {
+                    TextEditor(text: $taskMemo.memo).font(.body).frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text(taskMemo.memo)
+                        .font(.body)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if showConfetti {
+                    ConfettiView()
+                        .allowsHitTesting(false) // 터치 무시 (애니메이션 중에도 조작 가능하게)
+                }
+            }
+            HStack {
+                Button(action: {
+                    isEditing.toggle()
+                }) {
+                    Text(isEditing ? "완료" : "수정하기") // 상태에 따라 글자 변경
+                        .font(.default)
+                        .foregroundColor(.white) // 글자색 흰색
+                        .padding() // 글자 주변 여백 확보
+                        .cornerRadius(10) // 모서리 둥글게
+                }.buttonStyle(.plain)
+
+                if taskMemo.startTime == nil {
+                    Button(action: {
+                        taskMemo.startTime = Date.now
+                    }) {
+                        Text("작업 시작 !") // 상태에 따라 글자 변경
+                            .font(.default)
+                            .foregroundColor(.white) // 글자색 흰색
+                            .padding() // 글자 주변 여백 확보
+                            .cornerRadius(10) // 모서리 둥글게
+                    }.buttonStyle(.plain)
+                }
+                if taskMemo.startTime != nil && taskMemo.endTime == nil {
+                    Button(action: {
+                        taskMemo.endTime = Date.now
+
+                        // (2) 빵빠레 터뜨리기!
+                        showConfetti = true
+
+                        // (3) 0.8초만 기다렸다가 창 닫기 (애니메이션 볼 시간 주기)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {}
+                    }) {
+                        Text("작업 종료 !") // 상태에 따라 글자 변경
+                            .font(.default)
+                            .foregroundColor(.white) // 글자색 흰색
+                            .padding() // 글자 주변 여백 확보
+                            .background(Color.teal)
+                            .cornerRadius(10) // 모서리 둥글게
+                    }.buttonStyle(.plain)
+                }
             }
         }
         .padding()
