@@ -10,4 +10,5 @@ DerivedData/
 
 ## 로그 파일 및 임시 파일
 *.log
-*.swp
+*.swp*.xcuserstate
+xcuserdata/
